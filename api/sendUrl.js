@@ -2,23 +2,27 @@ import fetch from "node-fetch";
 import nodemailer from "nodemailer";
 
 export default async function handler(req, res) {
-  // Always set CORS headers
-  res.setHeader("Access-Control-Allow-Origin", "https://archiveofourown.org");
+  // === 1️⃣ Always set CORS headers first ===
+  const allowedOrigin = "https://archiveofourown.org"; // whitelist AO3
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // Preflight request
+  // === 2️⃣ Handle OPTIONS preflight immediately ===
   if (req.method === "OPTIONS") {
-    return res.status(204).end(); // No content for OPTIONS
+    return res.status(204).end(); // No content
   }
 
+  // Only allow POST
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  // === 3️⃣ Extract data from request ===
   const { url, filename } = req.body;
   if (!url || !filename) return res.status(400).json({ error: "Missing URL or filename" });
 
+  // === 4️⃣ Set up email transporter ===
   const KINDLE_EMAIL = process.env.KINDLE_EMAIL;
   const GMAIL_USER = process.env.GMAIL_USER;
   const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
@@ -30,6 +34,7 @@ export default async function handler(req, res) {
     auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
   });
 
+  // === 5️⃣ Fetch EPUB and send email ===
   try {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Failed to fetch EPUB: ${response.status}`);
@@ -43,9 +48,9 @@ export default async function handler(req, res) {
       attachments: [{ filename, content: buffer }],
     });
 
-    res.status(200).json({ message: "EPUB sent to Kindle via Node.js!" });
+    return res.status(200).json({ message: "EPUB sent to Kindle via Node.js!" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 }
